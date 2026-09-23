@@ -1,0 +1,10 @@
+# Segredos locais
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.ruff_cache/
+
+docs/spec.md
