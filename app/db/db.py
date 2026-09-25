@@ -1,10 +1,9 @@
 from collections.abc import Iterator
 from contextlib import contextmanager
 
+from app.config import settings
 from sqlalchemy import URL, create_engine
 from sqlalchemy.orm import Session, sessionmaker
-
-from app.config import settings
 
 database_url = URL.create(
     "postgresql+psycopg",

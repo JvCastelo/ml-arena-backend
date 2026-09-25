@@ -14,11 +14,11 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.models.base import Base
+from app.db.models.base import Base
 
 if TYPE_CHECKING:
-    from app.models.artifact import Artifact
-    from app.models.user import User
+    from app.db.models.artifact import Artifact
+    from app.db.models.user import User
 
 
 class Run(Base):

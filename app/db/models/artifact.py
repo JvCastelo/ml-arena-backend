@@ -13,10 +13,10 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.models.base import Base
+from app.db.models.base import Base
 
 if TYPE_CHECKING:
-    from app.models.run import Run
+    from app.db.models.run import Run
 
 
 class Artifact(Base):

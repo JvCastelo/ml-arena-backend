@@ -9,11 +9,11 @@
 # Pré-requisito: `docker compose up -d` rodando e `.env` preenchido.
 
 # %%
+from app.models import Artifact, Run, User
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
 from app.db import get_session
-from app.models import Artifact, Run, User
 
 # %% [markdown]
 # ## 1. Criar um user (equivalente a um POST de cadastro)
