@@ -22,6 +22,13 @@ if TYPE_CHECKING:
 
 
 class Run(Base):
+    """Uma execução de treino de um modelo: hiperparâmetros e métricas.
+
+    `status`: created (ainda sem CSV) -> processing (o worker está gerando os
+    plots) -> done | failed. Por convenção `metrics` é {"train": {...},
+    "test": {...}}, mas o formato é livre (JSONB).
+    """
+
     __tablename__ = "runs"
     __table_args__ = (
         CheckConstraint(
@@ -48,6 +55,8 @@ class Run(Base):
     )
 
     user: Mapped[User] = relationship(back_populates="runs")
+    # Apagar o run apaga os artifacts: quem faz isso é o banco (ON DELETE CASCADE).
+    # O passive_deletes evita o SQLAlchemy carregá-los antes, o que falharia em async.
     artifacts: Mapped[list[Artifact]] = relationship(
         back_populates="run", cascade="all, delete-orphan", passive_deletes=True
     )
