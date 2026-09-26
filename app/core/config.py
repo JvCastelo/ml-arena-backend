@@ -3,6 +3,11 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
+    """Configurações lidas das variáveis de ambiente (ou do `.env`, se existir).
+
+    Todas são obrigatórias: faltando alguma, a aplicação não sobe.
+    """
+
     db_host: str
     db_port: int
     db_user: str

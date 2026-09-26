@@ -11,6 +11,8 @@ if TYPE_CHECKING:
 
 
 class User(Base):
+    """Usuário da plataforma. Cada run pertence a um usuário e é privado a ele."""
+
     __tablename__ = "users"
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -21,4 +23,5 @@ class User(Base):
         DateTime(timezone=True), server_default=func.now()
     )
 
+    # Sem cascade: o banco recusa apagar um usuário que ainda tem runs.
     runs: Mapped[list[Run]] = relationship(back_populates="user")

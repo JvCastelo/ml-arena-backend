@@ -20,6 +20,13 @@ if TYPE_CHECKING:
 
 
 class Artifact(Base):
+    """Arquivo de um run guardado no S3: o CSV de entrada ou um plot gerado.
+
+    A linha nasce `pending` e vai para done | failed. `s3_key` segue
+    runs/{run_id}/... e `size_bytes` só é conhecido quando o arquivo existe.
+    Um run tem no máximo um artifact de cada `type` (UNIQUE run_id + type).
+    """
+
     __tablename__ = "artifacts"
     __table_args__ = (
         UniqueConstraint("run_id", "type"),
