@@ -7,13 +7,14 @@ requires-python = ">=3.14"
 dependencies = [
     "alembic>=1.20.0",
     "asyncpg>=0.31.0",
+    "bcrypt==3.2.2",
     "boto3>=1.43.98",
     "fastapi[standard]>=0.141.1",
     "passlib[bcrypt]>=1.7.4",
     "pyjwt>=2.15.0",
     "python-dotenv>=1.2.3",
     "python-multipart>=0.0.32",
-    "sqlalchemy>=2.0.54",
+    "sqlalchemy[asyncio]>=2.0.54",
 ]
 
 [dependency-groups]

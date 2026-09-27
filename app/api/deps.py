@@ -1,29 +1,45 @@
 from typing import Annotated
-
-from fastapi import Depends, Header, HTTPException, status
+import jwt
+from fastapi import Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from app.db.models import User
+from sqlalchemy import select
+from app.core.config import settings
+from app.db.models.user import User
 from app.db.session import get_session
 
-SessionDep = Annotated[AsyncSession, Depends(get_session)]
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/v1/auth/login")
 
 
-# PROVISÓRIO — remover antes do deploy. Qualquer cliente pode se passar por
-# qualquer usuário mandando o header X-User-Id. Será substituído pela leitura
-# do JWT, mantendo a mesma assinatura (as rotas só dependem de CurrentUserDep).
 async def get_current_user(
-    session: SessionDep,
-    x_user_id: Annotated[int | None, Header()] = None,
+    token: str = Depends(oauth2_scheme), db: AsyncSession = Depends(get_session)
 ) -> User:
-    """Usuário logado, identificado (por ora) pelo header X-User-Id. 401 se ausente."""
-    if x_user_id is None:
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Missing X-User-Id header")
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Não foi possível validar as credenciais.",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
 
-    user = await session.get(User, x_user_id)
+    try:
+        payload = jwt.decode(
+            token, settings.secret_key, algorithms=[settings.algorithm]
+        )
+
+        email: str = payload.get("sub")
+        if email is None:
+            raise credentials_exception
+    except jwt.InvalidTokenError:
+        raise credentials_exception
+
+    query = select(User).where(User.email == email)
+    result = await db.execute(query)
+    user = result.scalars().first()
+
     if user is None:
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Unknown user")
+        raise credentials_exception
+
     return user
 
 
+SessionDep = Annotated[AsyncSession, Depends(get_session)]
 CurrentUserDep = Annotated[User, Depends(get_current_user)]
