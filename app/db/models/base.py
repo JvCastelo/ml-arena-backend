@@ -1,3 +1,9 @@
+"""Base declarativa de todos os modelos, com a convenção de nomes das constraints.
+
+A `NAMING_CONVENTION` faz o Postgres criar nomes previsíveis (pk_, fk_, uq_, ck_),
+para o Alembic conseguir alterar ou remover constraints depois.
+"""
+
 from sqlalchemy import MetaData
 from sqlalchemy.orm import DeclarativeBase
 
@@ -11,4 +17,6 @@ NAMING_CONVENTION = {
 
 
 class Base(DeclarativeBase):
+    """Classe base de todos os modelos. Herda o mapeamento do SQLAlchemy e usa a NAMING_CONVENTION."""
+
     metadata = MetaData(naming_convention=NAMING_CONVENTION)

@@ -1,3 +1,9 @@
+"""Tabela `runs`: um treino de modelo com hiperparâmetros, métricas e status.
+
+Usada por `app/repositories/run_repository.py` (CRUD), `app/services/run_service.py`
+(regras: dono, comparação, upload) e `worker/consumer.py` (muda o status durante o processamento).
+"""
+
 from datetime import datetime
 from typing import TYPE_CHECKING
 

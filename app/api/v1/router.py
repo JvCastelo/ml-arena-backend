@@ -1,3 +1,8 @@
+"""Agrega os routers da API v1 sob os prefixos de cada assunto.
+
+Resultado: /api/v1/runs, /api/v1/auth e /api/v1/users. Incluído em `app/main.py`.
+"""
+
 from fastapi import APIRouter
 
 from app.api.v1.routes import runs

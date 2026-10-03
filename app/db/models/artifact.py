@@ -1,3 +1,9 @@
+"""Tabela `artifacts`: arquivos do run no S3 (CSV de entrada e os dois plots).
+
+Usada por `app/repositories/artifact_repository.py`, pelo `run_service.py` (upload
+do CSV e URLs no compare) e pelo `worker/consumer.py` (gera e marca os plots).
+"""
+
 from datetime import datetime
 from typing import TYPE_CHECKING
 
@@ -31,7 +37,7 @@ class Artifact(Base):
     __table_args__ = (
         UniqueConstraint("run_id", "type"),
         CheckConstraint(
-            "type IN ('csv_actual_predicted', 'plot_measured_predicted', "
+            "type IN ('csv_measured_predicted', 'plot_measured_predicted', "
             "'plot_residuals')",
             name="type_valid",
         ),

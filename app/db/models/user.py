@@ -1,3 +1,9 @@
+"""Tabela `users`: quem se cadastra e faz login (e-mail + senha com hash bcrypt).
+
+Usada por `app/repositories/user_repository.py`, pelo `app/api/deps.py` (identifica
+o usuário do token) e pelo `run.py` (cada run aponta para o seu dono).
+"""
+
 from datetime import datetime
 from typing import TYPE_CHECKING
 

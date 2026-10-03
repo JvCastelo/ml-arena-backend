@@ -1,7 +1,6 @@
 from datetime import datetime
 from typing import Any
 
-from botocore.utils import datetime2timestamp
 from app.core.aws import aws_session
 from app.core.config import settings
 
