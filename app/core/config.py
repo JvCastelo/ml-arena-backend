@@ -26,11 +26,16 @@ class Settings(BaseSettings):
     secret_key: str
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 60 * 24 * 7
-    # AWS: região, bucket dos CSVs e PNGs, tópico de publicação e fila do worker
+    # AWS: região, bucket, tópico, fila e tabela de auditoria
     aws_region: str
     s3_bucket_name: str
     sns_topic_arn: str
     sqs_queue_url: str
+    dynamodb_audit_table: str | None = None
+    # Chaves opcionais: se ausentes, o boto3 usa a cadeia padrão (ambiente, IAM role)
+    aws_access_key_id: str | None = None
+    aws_secret_access_key: str | None = None
+    aws_session_token: str | None = None
 
     # `extra="ignore"`: variáveis que não estão aqui (ex.: AWS_* usadas pelo boto3) são ignoradas
     model_config = SettingsConfigDict(

@@ -1,14 +1,27 @@
-"""Rotas de runs: CRUD, listagem paginada, comparação e upload do CSV.
+"""Rotas de runs: CRUD, listagem paginada, comparação, upload do CSV e auditoria.
 
 Todas exigem login (`CurrentUserDep`). As regras ficam em
 `app/services/run_service.py`; a rota só traduz HTTP para o service e devolve a resposta.
+As ações de criar, editar e apagar são gravadas no log de auditoria em segundo plano.
 """
 
 from typing import Annotated
-from fastapi import APIRouter, File, HTTPException, Query, Response, UploadFile, status
+
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    File,
+    HTTPException,
+    Query,
+    Request,
+    Response,
+    UploadFile,
+    status,
+)
+
 from app.api.deps import CurrentUserDep, SessionDep
+from app.repositories import run_repository
 from app.schemas.artifact import ArtifactRead
-from app.services.csv_validation import MAX_CSV_BYTES
 from app.schemas.run import (
     RunComparison,
     RunCreate,
@@ -18,16 +31,31 @@ from app.schemas.run import (
     RunStatus,
     RunUpdate,
 )
-from app.services import run_service
-from app.repositories import run_repository
+from app.services import audit_service, run_service
+from app.services.csv_validation import MAX_CSV_BYTES
 
 router = APIRouter()
 
 
 @router.post("", response_model=RunRead, status_code=status.HTTP_201_CREATED)
-async def create_run(payload: RunCreate, session: SessionDep, user: CurrentUserDep):
-    """Cria um run do usuário logado (nasce com status created)."""
-    return await run_service.create_run(session, user.id, payload)
+async def create_run(
+    payload: RunCreate,
+    session: SessionDep,
+    user: CurrentUserDep,
+    request: Request,
+    background_tasks: BackgroundTasks,
+):
+    """Cria um run do usuário logado (nasce com status created) e registra a ação."""
+    created_run = await run_service.create_run(session, user.id, payload)
+    background_tasks.add_task(
+        audit_service.log_user_action,
+        user_id=user.id,
+        action="CREATE_RUN",
+        resource_id=created_run.id,
+        ip_address=request.client.host if request.client else None,
+        details=payload.model_dump(),
+    )
+    return created_run
 
 
 @router.get("", response_model=RunList)
@@ -89,14 +117,46 @@ async def get_run(run_id: int, session: SessionDep, user: CurrentUserDep):
 
 @router.patch("/{run_id}", response_model=RunRead)
 async def update_run(
-    run_id: int, payload: RunUpdate, session: SessionDep, user: CurrentUserDep
+    run_id: int,
+    payload: RunUpdate,
+    session: SessionDep,
+    user: CurrentUserDep,
+    request: Request,
+    background_tasks: BackgroundTasks,
 ):
     """Edita campos do run (PATCH parcial). O status não é editável pelo cliente."""
-    return await run_service.update_run(session, run_id, user.id, payload)
+    updated_run = await run_service.update_run(session, run_id, user.id, payload)
+
+    background_tasks.add_task(
+        audit_service.log_user_action,
+        user_id=user.id,
+        action="UPDATE_RUN",
+        resource_id=run_id,
+        ip_address=request.client.host if request.client else None,
+        details=payload.model_dump(exclude_unset=True),
+    )
+    return updated_run
 
 
 @router.delete("/{run_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_run(run_id: int, session: SessionDep, user: CurrentUserDep):
-    """Apaga o run, seus artifacts (banco) e os arquivos no S3."""
-    await run_service.delete_run(session, run_id, user.id)
+async def delete_run(
+    run_id: int,
+    session: SessionDep,
+    user: CurrentUserDep,
+    request: Request,
+    background_tasks: BackgroundTasks,
+):
+    """Apaga o run, seus artifacts (banco) e os arquivos no S3, e registra a ação."""
+    deleted_run = await run_service.delete_run(session, run_id, user.id)
+
+    run_snapshot = RunRead.model_validate(deleted_run).model_dump(mode="json")
+
+    background_tasks.add_task(
+        audit_service.log_user_action,
+        user_id=user.id,
+        action="DELETE_RUN",
+        resource_id=run_id,
+        ip_address=request.client.host if request.client else None,
+        details=run_snapshot,
+    )
     return Response(status_code=status.HTTP_204_NO_CONTENT)

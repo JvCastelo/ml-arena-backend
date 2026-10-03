@@ -36,4 +36,5 @@ async def authenticate_user(session: AsyncSession, email: str, password: str) ->
     return {
         "access_token": create_access_token(subject=user.email),
         "token_type": "bearer",
+        "user_id": user.id,
     }

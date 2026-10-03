@@ -57,7 +57,7 @@ async def update_run(
     return await run_repository.update_run(session, run, update_data)
 
 
-async def delete_run(session: AsyncSession, run_id: int, user_id: int) -> None:
+async def delete_run(session: AsyncSession, run_id: int, user_id: int) -> Run:
     """Apaga o run no banco e, depois, os arquivos dele no S3 (melhor esforço)."""
     run = await get_owned_run_or_404(session, run_id, user_id, with_artifacts=True)
     s3_keys = [artifact.s3_key for artifact in run.artifacts]
@@ -70,6 +70,7 @@ async def delete_run(session: AsyncSession, run_id: int, user_id: int) -> None:
         logger.exception(
             "Run %s apagado, mas falhou ao apagar objetos do S3: %s", run_id, s3_keys
         )
+    return run
 
 
 def _compared(run: Run) -> ComparedRun:
