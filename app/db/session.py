@@ -1,3 +1,11 @@
+"""Conexão com o PostgreSQL: engine assíncrono e sessões.
+
+Dois jeitos de usar a mesma fábrica de sessões:
+- `get_session` (dependência do FastAPI): uma sessão por requisição, via `Depends`.
+- `session_scope` (`async with`): para o worker e scripts, fora do FastAPI.
+Usado por `app/api/deps.py`, pelas rotas e por `worker/consumer.py`.
+"""
+
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 

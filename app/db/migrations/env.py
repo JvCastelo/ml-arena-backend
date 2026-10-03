@@ -1,3 +1,9 @@
+"""Configuração do Alembic: diz onde estão os modelos e qual banco migrar.
+
+A URL vem de `app/core/config.py` (o mesmo `.env` da aplicação). Migrations rodam com
+`alembic upgrade head`. Este arquivo é o template padrão, adaptado para o driver assíncrono.
+"""
+
 import asyncio
 from logging.config import fileConfig
 
@@ -56,6 +62,7 @@ def run_migrations_offline() -> None:
 
 
 def do_run_migrations(connection: Connection) -> None:
+    """Executa as migrations numa conexão já aberta (modo online, dentro do contexto assíncrono)."""
     context.configure(connection=connection, target_metadata=target_metadata)
 
     with context.begin_transaction():

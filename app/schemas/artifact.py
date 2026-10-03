@@ -1,3 +1,5 @@
+"""Formato JSON de um artifact na resposta da API. Não expõe a chave do S3 de propósito."""
+
 from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict

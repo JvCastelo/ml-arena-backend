@@ -1,3 +1,9 @@
+"""Formatos JSON de entrada e saída de runs (Pydantic).
+
+Create/Update validam o que o cliente envia (PATCH: só campos enviados, nunca null,
+nunca status). Read/Detail/List são o que a API devolve. Compare traz os dois lados com URLs dos plots.
+"""
+
 from datetime import datetime
 from typing import Any, Literal, Self
 
@@ -31,6 +37,7 @@ class RunUpdate(BaseModel):
 
     @model_validator(mode="after")
     def reject_explicit_nulls(self) -> Self:
+        """Recusa null em campo enviado no PATCH (ausente é diferente de null, e null não faz sentido aqui)."""
         for field in self.model_fields_set:
             if getattr(self, field) is None:
                 raise ValueError(f"{field} não pode ser null")
@@ -67,3 +74,16 @@ class RunList(BaseModel):
     total: int
     limit: int
     offset: int
+
+
+class ComparedRun(RunRead):
+    """Um lado da comparação. `plots` tem URL por tipo, ou null se o plot ainda não existe."""
+
+    plots: dict[str, str | None]
+
+
+class RunComparison(BaseModel):
+    """GET /runs/compare?run_a=&run_b=: os dois runs prontos pra tela de batalha."""
+
+    run_a: ComparedRun
+    run_b: ComparedRun

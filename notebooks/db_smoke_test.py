@@ -63,8 +63,8 @@ async with session_scope() as session:
         [
             Artifact(
                 run_id=run_id,
-                type="csv_actual_predicted",
-                s3_key=f"runs/{run_id}/actual_predicted.csv",
+                type="csv_measured_predicted",
+                s3_key=f"runs/{run_id}/measured_predicted.csv",
                 status="done",
                 size_bytes=2048,
             ),

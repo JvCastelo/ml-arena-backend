@@ -1,3 +1,9 @@
+"""Ponto de entrada da aplicação FastAPI.
+
+Rode com `fastapi dev app/main.py` (dev) ou `fastapi run` (produção). Liga o router da API
+em /api/v1 e expõe /health, que o ALB usa para saber se a instância está de pé.
+"""
+
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 

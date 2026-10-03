@@ -1,3 +1,8 @@
+"""Regras de autenticação: cadastro e login.
+
+Usa `user_repository` (banco) e `core/security` (hash e token). Quem chama: `app/api/v1/routes/users.py` e `auth.py`.
+"""
+
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -7,6 +12,7 @@ from app.schemas.user import UserCreate
 
 
 async def register_user(session: AsyncSession, user_in: UserCreate):
+    """Cadastra um usuário novo. Recusa e-mail já usado (400) e guarda só o hash da senha."""
     existing_user = await user_repository.get_user_by_email(session, user_in.email)
     if existing_user:
         raise HTTPException(
@@ -20,6 +26,7 @@ async def register_user(session: AsyncSession, user_in: UserCreate):
 
 
 async def authenticate_user(session: AsyncSession, email: str, password: str) -> dict:
+    """Valida e-mail e senha. Se bater, devolve um JWT. Mensagem genérica de propósito, para não revelar qual dos dois estava errado."""
     user = await user_repository.get_user_by_email(session, email)
     if not user or not verify_password(password, user.password_hash):
         raise HTTPException(
