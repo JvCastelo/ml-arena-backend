@@ -29,6 +29,7 @@ async def update_run(
     return await run_repository.update_run(session, run, update_data)
 
 
-async def delete_run(session: AsyncSession, run_id: int, user_id: int) -> None:
+async def delete_run(session: AsyncSession, run_id: int, user_id: int) -> Run:
     run = await get_owned_run_or_404(session, run_id, user_id)
     await run_repository.delete_run(session, run)
+    return run
