@@ -35,7 +35,7 @@ def _put_object(key: str, data: bytes) -> None:
 
 
 async def upload_measured_predicted(run_id: int, data: bytes) -> str:
-    """Sobe o CSV medido×previsto e devolve a chave do objeto no bucket."""
+    """Sobe o CSV medidoxprevisto e devolve a chave do objeto no bucket."""
     key = measured_predicted_key(run_id)
     # boto3 é síncrono: roda numa thread pra não travar o event loop do FastAPI.
     await asyncio.to_thread(_put_object, key, data)

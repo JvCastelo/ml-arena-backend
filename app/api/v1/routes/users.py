@@ -3,13 +3,14 @@
 A regra do cadastro fica em `app/services/auth_service.py`. O cadastro é registrado na auditoria.
 """
 
-from fastapi import APIRouter, status, Depends, Request, BackgroundTasks
+from fastapi import APIRouter, BackgroundTasks, Depends, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.api.deps import get_current_user
-from app.db.session import get_session
 from app.db.models import User
+from app.db.session import get_session
 from app.schemas.user import UserCreate, UserResponse
-from app.services import auth_service, audit_service
+from app.services import audit_service, auth_service
 
 router = APIRouter()
 

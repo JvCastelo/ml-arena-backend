@@ -21,7 +21,7 @@ from app.core.config import settings
 from app.db.models import Artifact, Run
 from app.db.session import session_scope
 from app.repositories import artifact_repository, run_repository
-from app.services import storage
+from app.services import audit_service, storage
 from worker.processing import make_plots, read_pairs
 
 logger = logging.getLogger("worker")
@@ -86,6 +86,21 @@ async def _ensure_plot_artifact(
     )
 
 
+async def _audit_worker(user_id: int, action: str, run_id: int, details: dict) -> None:
+    """Registra uma ação de auditoria do worker, com detalhes do run."""
+    try:
+        await audit_service.log_user_action(
+            user_id=user_id,
+            action=action,
+            resource_id=run_id,
+            details=details,
+        )
+    except Exception as e:
+        logger.exception(
+            "Run %s: falha ao gravar auditoria (%s): %s", run_id, action, e
+        )
+
+
 async def process_run(run_id: int) -> None:
     """O trabalho de verdade: CSV do S3 → plots → S3 → banco."""
     async with session_scope() as session:
@@ -126,11 +141,18 @@ async def process_run(run_id: int) -> None:
                 session, plot_artifacts[plot_type], status="done", size_bytes=len(image)
             )
 
+        duration = time.monotonic() - started
         await run_repository.update_run(
             session,
             run,
-            {"status": "done", "processing_duration_s": time.monotonic() - started},
+            {"status": "done", "processing_duration_s": duration},
         )
+    await _audit_worker(
+        user_id=run.user_id,
+        action="PROCESS_RUN_DONE",
+        run_id=run_id,
+        details={"processing_duration_s": duration, "plots": list(PLOT_FILES.keys())},
+    )
     logger.info("ETAPA 3 concluída: run %s processado.", run_id)
 
 
@@ -150,6 +172,12 @@ async def _mark_failed(run_id: int, message: str) -> None:
         await run_repository.update_run(
             session, run, {"status": "failed", "error_message": message}
         )
+    await _audit_worker(
+        user_id=run.user_id,
+        action="PROCESS_RUN_FAILED",
+        run_id=run_id,
+        details={"error_message": message},
+    )
 
 
 async def handle_message(message: dict) -> None:

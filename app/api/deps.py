@@ -5,11 +5,13 @@
 """
 
 from typing import Annotated
+
 import jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.core.config import settings
 from app.db.models.user import User
 from app.db.session import get_session
