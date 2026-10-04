@@ -4,9 +4,10 @@ Só faz SQL e commit. As regras (dono, 404, status) ficam em `app/services/run_s
 Quem chama: `run_service.py`.
 """
 
-from sqlalchemy import select, func
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
+
 from app.db.models import Run
 
 

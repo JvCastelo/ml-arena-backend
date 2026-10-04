@@ -9,7 +9,7 @@ import io
 import matplotlib
 
 matplotlib.use("Agg")  # sem tela no container: renderiza direto pra memória
-import matplotlib.pyplot as plt  # noqa: E402
+import matplotlib.pyplot as plt
 
 
 def read_pairs(data: bytes) -> tuple[list[float], list[float]]:

@@ -12,9 +12,9 @@ from fastapi import HTTPException, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.db.models import Artifact, Run
 from app.repositories import artifact_repository, run_repository
 from app.schemas.run import ComparedRun, RunComparison, RunCreate, RunRead, RunUpdate
-from app.db.models import Artifact, Run
 from app.services import messaging, storage
 from app.services.csv_validation import (
     CsvValidationError,

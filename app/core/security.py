@@ -4,7 +4,7 @@ Usado por `app/services/auth_service.py` (cadastro e login). A validação do
 token recebido fica em `app/api/deps.py`, que usa a mesma `SECRET_KEY`.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import jwt
 from passlib.context import CryptContext
@@ -28,9 +28,7 @@ def get_password_hash(password: str) -> str:
 def create_access_token(subject: str | any) -> str:
     """Cria o Token JWT guardando o email (ou ID) do usuário."""
     # `exp` é a validade: depois desse horário o token é recusado na validação.
-    expire = datetime.now(timezone.utc) + timedelta(
-        minutes=settings.access_token_expire_minutes
-    )
+    expire = datetime.now(UTC) + timedelta(minutes=settings.access_token_expire_minutes)
 
     # `sub` (subject) é de quem é o token. Aqui é o e-mail do usuário.
     to_encode = {"exp": expire, "sub": str(subject)}

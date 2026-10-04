@@ -1,4 +1,5 @@
 import aioboto3
+
 from app.core.config import settings
 
 aws_session = aioboto3.Session(

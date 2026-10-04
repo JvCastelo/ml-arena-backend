@@ -6,7 +6,7 @@ Usa `user_repository` (banco) e `core/security` (hash e token). Quem chama: `app
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.security import get_password_hash, verify_password, create_access_token
+from app.core.security import create_access_token, get_password_hash, verify_password
 from app.repositories import user_repository
 from app.schemas.user import UserCreate
 

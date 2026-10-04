@@ -4,12 +4,13 @@ Recebe o formulário (username = e-mail, password) no formato OAuth2 e devolve o
 A lógica fica em `app/services/auth_service.py`. Registra a ação LOGIN na auditoria.
 """
 
-from fastapi import APIRouter, Depends, Request, BackgroundTasks
+from fastapi import APIRouter, BackgroundTasks, Depends, Request
 from fastapi.security import OAuth2PasswordRequestForm
-from app.db.session import get_session
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.db.session import get_session
 from app.schemas.token import Token
-from app.services import auth_service, audit_service
+from app.services import audit_service, auth_service
 
 router = APIRouter()
 
