@@ -90,6 +90,8 @@ async def upload_measured_predicted(
     run_id: int,
     session: SessionDep,
     user: CurrentUserDep,
+    request: Request,
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
 ):
     """Sobe o CSV medidoxprevisto do run. Um por run: se já existir, 409."""
@@ -104,7 +106,21 @@ async def upload_measured_predicted(
             status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
             f"O arquivo passa do limite de {MAX_CSV_BYTES // (1024 * 1024)} MB.",
         )
-    return await run_service.upload_measured_predicted(session, run_id, user.id, data)
+
+    artifact = await run_service.upload_measured_predicted(
+        session, run_id, user.id, data
+    )
+
+    background_tasks.add_task(
+        audit_service.log_user_action,
+        user_id=user.id,
+        action="UPLOAD_CSV",
+        resource_id=run_id,
+        ip_address=request.client.host if request.client else None,
+        details={"filename": file.filename, "size_bytes": len(data)},
+    )
+
+    return artifact
 
 
 @router.get("/{run_id}", response_model=RunDetail)
