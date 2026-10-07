@@ -4,7 +4,23 @@
 # Python
 __pycache__/
 *.py[cod]
+*.so
 .venv/
-.ruff_cache/
 
+# Ferramentas de Lint/Testes
+.ruff_cache/
+.pytest_cache/
+
+# Notebooks
+.ipynb_checkpoints/
+
+# IDEs
+.vscode/
+.idea/
+
+# Sistema Operacional
+.DS_Store
+Thumbs.db
+
+# Documentação / Específico do Projeto
 docs/spec.md

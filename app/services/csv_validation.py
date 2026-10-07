@@ -24,7 +24,7 @@ def validate_measured_predicted_csv(data: bytes) -> None:
     try:
         text = data.decode("utf-8-sig")
     except UnicodeDecodeError:
-        raise CsvValidationError("O arquivo não é um CSV de texto (UTF-8).")
+        raise CsvValidationError("O arquivo não é um CSV de texto (UTF-8).") from None
 
     reader = csv.DictReader(io.StringIO(text))
     header = reader.fieldnames or []
@@ -45,11 +45,11 @@ def validate_measured_predicted_csv(data: bytes) -> None:
             except ValueError:
                 raise CsvValidationError(
                     f"Linha {line_number}: '{column}' precisa ser numérico, mas veio '{raw}'."
-                )
+                ) from None
             if not math.isfinite(value):
                 raise CsvValidationError(
                     f"Linha {line_number}: '{column}' precisa ser um número finito."
-                )
+                ) from None
 
     if rows == 0:
         raise CsvValidationError("O CSV tem só o cabeçalho, sem linhas de dados.")

@@ -32,6 +32,7 @@ class Settings(BaseSettings):
     sns_topic_arn: str
     sqs_queue_url: str
     dynamodb_audit_table: str | None = None
+    redis_url: str
     # Chaves opcionais: se ausentes, o boto3 usa a cadeia padrão (ambiente, IAM role)
     aws_access_key_id: str | None = None
     aws_secret_access_key: str | None = None

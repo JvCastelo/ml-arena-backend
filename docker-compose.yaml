@@ -35,5 +35,10 @@ services:
       - db
     command: python -m worker.consumer
 
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+
 volumes:
   postgres_data:

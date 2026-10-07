@@ -32,7 +32,7 @@ def _to_png(fig) -> bytes:
 
 def make_plots(measured: list[float], predicted: list[float]) -> dict[str, bytes]:
     """Gera os dois PNGs. As chaves são os tipos de artifact do banco."""
-    residuals = [m - p for m, p in zip(measured, predicted)]
+    residuals = [m - p for m, p in zip(measured, predicted, strict=False)]
 
     fig, ax = plt.subplots(figsize=(6, 6))
     ax.scatter(measured, predicted, s=12, alpha=0.7)

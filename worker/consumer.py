@@ -10,13 +10,12 @@ import asyncio
 import json
 import logging
 import time
-from functools import cache
 
-import boto3
 from botocore.config import Config
 from botocore.exceptions import BotoCoreError, ClientError
 from sqlalchemy.exc import OperationalError
 
+from app.core.aws import aws_session
 from app.core.config import settings
 from app.db.models import Artifact, Run
 from app.db.session import session_scope
@@ -39,35 +38,6 @@ MAX_ATTEMPTS = 3
 PERMANENT_ERRORS = (ValueError, KeyError)
 # Erro de infraestrutura: S3, SQS ou banco fora do ar. Vale tentar de novo.
 TRANSIENT_ERRORS = (BotoCoreError, ClientError, OperationalError)
-
-
-@cache
-def _sqs_client():
-    # Sem timeout, uma resposta perdida na rede deixava o worker preso no recebimento.
-    # O long poll dura até 20s, então o read_timeout fica acima disso.
-    """Cliente boto3 do SQS, criado uma vez, com timeouts de rede (ver comentário)."""
-    return boto3.client(
-        "sqs",
-        region_name=settings.aws_region,
-        config=Config(read_timeout=30, connect_timeout=10, retries={"max_attempts": 3}),
-    )
-
-
-def _receive():
-    """Consulta a fila com long polling de 20s. Devolve até uma mensagem (ou nenhuma)."""
-    return _sqs_client().receive_message(
-        QueueUrl=settings.sqs_queue_url,
-        MaxNumberOfMessages=1,
-        WaitTimeSeconds=20,  # long polling: espera até 20s por mensagem, sem ficar consultando
-        AttributeNames=["ApproximateReceiveCount"],
-    )
-
-
-def _delete(receipt_handle: str) -> None:
-    """Apaga a mensagem da fila. Só é chamado quando a mensagem foi tratada de vez (sucesso ou falha final)."""
-    _sqs_client().delete_message(
-        QueueUrl=settings.sqs_queue_url, ReceiptHandle=receipt_handle
-    )
 
 
 async def _ensure_plot_artifact(
@@ -180,7 +150,7 @@ async def _mark_failed(run_id: int, message: str) -> None:
     )
 
 
-async def handle_message(message: dict) -> None:
+async def handle_message(message: dict, sqs_client) -> None:
     """Trata uma mensagem: decide se apaga da fila (feito ou falha final) ou se deixa voltar (erro transitório)."""
     body = json.loads(message["Body"])
     run_id = body["run_id"]
@@ -204,21 +174,34 @@ async def handle_message(message: dict) -> None:
         logger.exception("Run %s: esgotou as %s tentativas.", run_id, MAX_ATTEMPTS)
         await _mark_failed(run_id, "Falha no processamento. Tente reenviar o CSV.")
 
-    await asyncio.to_thread(_delete, message["ReceiptHandle"])
+    await sqs_client.delete_message(
+        QueueUrl=settings.sqs_queue_url, ReceiptHandle=message["ReceiptHandle"]
+    )
 
 
 async def run_forever() -> None:
     """Loop principal: pede mensagem à fila, trata e repete. Se a fila falhar, espera 5s e tenta de novo."""
     logger.info("Worker escutando a fila %s", settings.sqs_queue_url)
+
+    sqs_config = Config(
+        read_timeout=30, connect_timeout=10, retries={"max_attempts": 3}
+    )
+
     while True:
         try:
-            response = await asyncio.to_thread(_receive)
-        except BotoCoreError, ClientError:
+            async with aws_session.client("sqs", config=sqs_config) as sqs:
+                while True:
+                    response = await sqs.receive_message(
+                        QueueUrl=settings.sqs_queue_url,
+                        MaxNumberOfMessages=1,
+                        WaitTimeSeconds=20,
+                        AttributeNames=["ApproximateReceiveCount"],
+                    )
+                    for message in response.get("Messages", []):
+                        await handle_message(message, sqs)
+        except (BotoCoreError, ClientError):
             logger.exception("Falha ao consultar a fila; tentando de novo em 5s.")
             await asyncio.sleep(5)
-            continue
-        for message in response.get("Messages", []):
-            await handle_message(message)
 
 
 if __name__ == "__main__":
