@@ -20,7 +20,6 @@ from fastapi import (
 )
 
 from app.api.deps import CurrentUserDep, SessionDep
-from app.repositories import run_repository
 from app.schemas.artifact import ArtifactRead
 from app.schemas.run import (
     RunComparison,
@@ -68,10 +67,9 @@ async def list_runs(
     status_filter: Annotated[RunStatus | None, Query(alias="status")] = None,
 ):
     """Lista os runs do usuário, paginados (limit/offset), com filtros opcionais de algoritmo e status."""
-    items, total = await run_repository.get_runs_paginated(
+    return await run_service.list_runs(
         session, user.id, limit, offset, algorithm, status_filter
     )
-    return RunList(items=items, total=total, limit=limit, offset=offset)
 
 
 # Precisa vir antes de "/{run_id}": senão "compare" é lido como id e responde 422.
