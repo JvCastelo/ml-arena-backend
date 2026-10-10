@@ -186,7 +186,7 @@ async def upload_measured_predicted(
     try:
         validate_measured_predicted_csv(data)
     except CsvValidationError as exc:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc)) from exec
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc)) from exc
 
     artifact = await _start_csv_upload(session, run)
 

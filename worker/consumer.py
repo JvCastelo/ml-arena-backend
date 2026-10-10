@@ -17,6 +17,7 @@ from sqlalchemy.exc import OperationalError
 
 from app.core.aws import aws_session
 from app.core.config import settings
+from app.core.cache import invalidate_user_cache
 from app.db.models import Artifact, Run
 from app.db.session import session_scope
 from app.repositories import artifact_repository, run_repository
@@ -123,6 +124,7 @@ async def process_run(run_id: int) -> None:
         run_id=run_id,
         details={"processing_duration_s": duration, "plots": list(PLOT_FILES.keys())},
     )
+    await invalidate_user_cache(user_id=run.user_id)
     logger.info("ETAPA 3 concluída: run %s processado.", run_id)
 
 
@@ -148,6 +150,7 @@ async def _mark_failed(run_id: int, message: str) -> None:
         run_id=run_id,
         details={"error_message": message},
     )
+    await invalidate_user_cache(user_id=run.user_id)
 
 
 async def handle_message(message: dict, sqs_client) -> None:

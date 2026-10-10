@@ -33,8 +33,8 @@ async def download_object(key: str) -> bytes:
 async def upload_bytes(key: str, data: bytes, content_type: str) -> None:
     """Sobe bytes (ex.: PNG) no S3 com o content-type informado."""
     async with aws_session.client("s3") as s3:
-        s3.put_object(
-            Bucket=settings.s3_bucket_name, Key=key, Body=data, ContentType="text/csv"
+        await s3.put_object(
+            Bucket=settings.s3_bucket_name, Key=key, Body=data, ContentType=content_type
         )
 
 
