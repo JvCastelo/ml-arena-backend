@@ -1,11 +1,56 @@
 [project]
 name = "ml-arena-backend"
 version = "0.1.0"
-description = "Add your description here"
+description = "ML Arena: registro e comparação de runs de modelos de ML (FastAPI + AWS)"
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
-    "boto3>=1.43.98",
-    "flask>=3.1.3",
-    "sqlalchemy>=2.0.54",
+    "aioboto3>=15.5.0",
+    "alembic>=1.20.0",
+    "asyncpg>=0.31.0",
+    # Fixado: bcrypt >=4 quebra o autoteste do passlib ("password cannot be longer
+    # than 72 bytes").
+    "bcrypt==3.2.2",
+    "fastapi[standard]>=0.141.1",
+    "matplotlib>=3.11.2",
+    "passlib[bcrypt]>=1.7.4",
+    "pyjwt>=2.15.0",
+    "pydantic-settings>=2.0.0",
+    "python-multipart>=0.0.32",
+    "sqlalchemy[asyncio]>=2.0.54",
+    "redis>=8.1.0",
 ]
+
+[dependency-groups]
+dev = [
+    "ipykernel>=7.3.0",
+    "pytest>=9.1.1",
+    "ruff>=0.16.8",
+    "pre-commit>=4.0.0"
+]
+
+[tool.ruff]
+target-version = "py313"
+line-length = 88
+
+[tool.ruff.lint]
+select = [
+    "E",   # Erros de estilo (pycodestyle)
+    "F",   # Erros lógicos e variáveis não usadas (pyflakes)
+    "I",   # Ordenação automática de imports (isort)
+    "B",   # Caçador de bugs comuns (flake8-bugbear)
+    "UP",  # Atualiza sintaxe antiga para a versão atual do Python (pyupgrade)
+    "SIM", # Sugere simplificações de código (flake8-simplify)
+]
+ignore = [
+    "B008", # Permite chamadas de função nos argumentos (Necessário para o FastAPI: Depends, File, Query)
+    "E501", # Ignora o limite rígido de 88 caracteres por linha (Deixa o formatador cuidar do código e ignora textos longos)
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Células de notebook aceitam `await` no topo; o ruff lê como .py comum.
+"notebooks/*" = ["F704", "PLE1142"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]

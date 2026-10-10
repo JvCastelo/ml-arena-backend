@@ -1,0 +1,45 @@
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: ${DB_CONTAINER_NAME:-ml-arena-db}
+    environment:
+      POSTGRES_USER: ${DB_USER:-admin}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-123456}
+      POSTGRES_DB: ${DB_NAME:-meu_banco}
+    ports:
+      - "${DB_EXTERNAL_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  api:
+    build: .
+    container_name: ${API_CONTAINER_NAME:-ml-arena-api}
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    volumes:
+      - .:/workspace
+    depends_on:
+      - db
+    command: fastapi dev app/main.py --host 0.0.0.0 --port 8000
+
+  worker:
+    build: .
+    container_name: ${WORKER_CONTAINER_NAME:-ml-arena-worker}
+    env_file:
+      - .env
+    volumes:
+      - .:/workspace
+    depends_on:
+      - db
+    command: python -m worker.consumer
+
+  redis:
+    image: redis:alpine
+    container_name: ${REDIS_CONTAINER_NAME:-ml-arena-redis}
+    ports:
+      - "6379:6379"
+
+volumes:
+  postgres_data:
