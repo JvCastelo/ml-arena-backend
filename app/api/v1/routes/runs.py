@@ -2,7 +2,8 @@
 
 Todas exigem login (`CurrentUserDep`). As regras ficam em
 `app/services/run_service.py`; a rota só traduz HTTP para o service e devolve a resposta.
-As ações de criar, editar e apagar são gravadas no log de auditoria em segundo plano.
+Todas as ações (criar, listar, ler, comparar, editar, apagar, upload) são gravadas no log de
+auditoria em segundo plano.
 """
 
 from typing import Annotated
@@ -61,22 +62,54 @@ async def create_run(
 async def list_runs(
     session: SessionDep,
     user: CurrentUserDep,
+    request: Request,
+    background_tasks: BackgroundTasks,
     limit: Annotated[int, Query(ge=1, le=100)] = 20,
     offset: Annotated[int, Query(ge=0)] = 0,
     algorithm: str | None = None,
     status_filter: Annotated[RunStatus | None, Query(alias="status")] = None,
 ):
     """Lista os runs do usuário, paginados (limit/offset), com filtros opcionais de algoritmo e status."""
-    return await run_service.list_runs(
+    runs = await run_service.list_runs(
         session, user.id, limit, offset, algorithm, status_filter
     )
+    background_tasks.add_task(
+        audit_service.log_user_action,
+        user_id=user.id,
+        action="LIST_RUNS",
+        ip_address=request.client.host if request.client else None,
+        details={
+            "limit": limit,
+            "offset": offset,
+            "algorithm": algorithm,
+            "status": status_filter,
+            "total": runs["total"],
+        },
+    )
+    return runs
 
 
 # Precisa vir antes de "/{run_id}": senão "compare" é lido como id e responde 422.
 @router.get("/compare", response_model=RunComparison)
-async def compare(run_a: int, run_b: int, session: SessionDep, user: CurrentUserDep):
+async def compare(
+    run_a: int,
+    run_b: int,
+    session: SessionDep,
+    user: CurrentUserDep,
+    request: Request,
+    background_tasks: BackgroundTasks,
+):
     """Dois runs do usuário lado a lado. 404 se algum deles não for seu."""
-    return await run_service.compare_runs(session, user.id, run_a, run_b)
+    comparison = await run_service.compare_runs(session, user.id, run_a, run_b)
+    background_tasks.add_task(
+        audit_service.log_user_action,
+        user_id=user.id,
+        action="COMPARE_RUNS",
+        resource_id=f"{run_a},{run_b}",
+        ip_address=request.client.host if request.client else None,
+        details={"run_a": run_a, "run_b": run_b},
+    )
+    return comparison
 
 
 @router.post(
@@ -122,11 +155,26 @@ async def upload_measured_predicted(
 
 
 @router.get("/{run_id}", response_model=RunDetail)
-async def get_run(run_id: int, session: SessionDep, user: CurrentUserDep):
+async def get_run(
+    run_id: int,
+    session: SessionDep,
+    user: CurrentUserDep,
+    request: Request,
+    background_tasks: BackgroundTasks,
+):
     """Detalhe de um run, com a lista de artifacts. 404 se não for do usuário."""
-    return await run_service.get_owned_run_or_404(
+    run = await run_service.get_owned_run_or_404(
         session, run_id, user.id, with_artifacts=True
     )
+    background_tasks.add_task(
+        audit_service.log_user_action,
+        user_id=user.id,
+        action="READ_RUN",
+        resource_id=run_id,
+        ip_address=request.client.host if request.client else None,
+        details={"name": run.name, "status": run.status},
+    )
+    return run
 
 
 @router.patch("/{run_id}", response_model=RunRead)
