@@ -117,8 +117,8 @@ Edição **parcial**: só os campos enviados mudam. Aceita `name`, `algorithm`, 
 
 ### `DELETE /api/v1/runs/{id}` → 204
 
-Sem corpo. O banco apaga os artifacts (`ON DELETE CASCADE`).
-**TODO:** apagar também os objetos do S3 e gravar a ação no log de auditoria.
+Sem corpo. O banco apaga os artifacts (`ON DELETE CASCADE`); depois os objetos do S3 são apagados
+(melhor esforço) e a ação vai para o log de auditoria.
 
 ---
 
@@ -152,9 +152,23 @@ algum não for).
 
 ### Log de auditoria (DynamoDB)
 
-Toda ação de CRUD grava tipo da ação, dados manipulados e hora (`user_id` como partition key,
-`timestamp` como sort key). Ainda não há chamada nas rotas de runs; entra num serviço
-(`app/services/audit.py`) chamado por cada rota que escreve.
+Toda ação de CRUD grava tipo da ação, dados manipulados e hora na tabela do DynamoDB
+(`DYNAMODB_AUDIT_TABLE`; `user_id` como partition key, `timestamp` como sort key). A gravação
+roda em segundo plano (`BackgroundTasks` → `app/services/audit_service.py`): se o DynamoDB falhar,
+a resposta não muda e o erro só aparece no log.
+
+| Ação | Rota / origem | `details` |
+|---|---|---|
+| `CREATE_USER` | `POST /users/` | o payload, com a senha mascarada |
+| `LOGIN` | `POST /auth/login` (só sucesso) | `email_used` |
+| `CREATE_RUN` | `POST /runs` | o payload |
+| `LIST_RUNS` | `GET /runs` | filtros e `total` |
+| `READ_RUN` | `GET /runs/{id}` | `name`, `status` |
+| `COMPARE_RUNS` | `GET /runs/compare` | `run_a`, `run_b` |
+| `UPDATE_RUN` | `PATCH /runs/{id}` | só os campos enviados |
+| `DELETE_RUN` | `DELETE /runs/{id}` | o run como estava |
+| `UPLOAD_CSV` | `POST /runs/{id}/measured-predicted` | `filename`, `size_bytes` |
+| `PROCESS_RUN_DONE` / `_FAILED` | worker | duração ou motivo da falha |
 
 ### Arquivo binário obrigatório
 

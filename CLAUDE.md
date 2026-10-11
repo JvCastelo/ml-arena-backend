@@ -54,10 +54,8 @@ docs/                        # db-diagram.md, api-contract.md (spec.md é local 
 
 ```bash
 cp .env.example .env                    # e ajuste a senha, se quiser
-docker compose up -d                    # Postgres local
-uv sync
-uv run alembic upgrade head             # cria as tabelas (não existe mais create_all)
-uv run fastapi dev app/main.py          # http://127.0.0.1:8000/docs
+docker compose up -d --build            # db, redis, migrate (alembic upgrade head), api e worker
+uv sync                                 # para pytest/ruff/alembic fora do container
 uv run pytest
 uv run ruff check . && uv run ruff format .
 ```
@@ -149,9 +147,8 @@ Usuários que já existem no banco de desenvolvimento têm `password_hash` falso
 
 ### Próximos passos do projeto (por ordem de risco)
 
-1. **Log de auditoria no DynamoDB** (`app/services/audit.py`): toda ação de CRUD grava tipo da
-   ação, dados manipulados e hora. **Os endpoints de runs ainda não gravam nada** (há TODO no
-   `delete_run`). Partition key `user_id`, sort key `timestamp`.
+1. ~~**Log de auditoria no DynamoDB**~~ feito: toda ação de CRUD, inclusive as leituras, grava no
+   DynamoDB (lista de ações em `docs/api-contract.md`).
 2. **Upload do CSV → S3 → SNS/SQS → worker** que gera os dois plots (`POST
    /runs/{id}/actual-predicted`). É o coração do trabalho e a parte mais arriscada.
 3. **`GET /runs/compare`** e **cache no ElastiCache** (chave canonizada com os ids em ordem).

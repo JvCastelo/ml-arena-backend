@@ -2,8 +2,9 @@
 
 Roda como processo separado (`python -m worker.consumer`), fora da API. Para cada mensagem:
 baixa o CSV do S3, gera os dois PNGs (`worker/processing.py`), sobe os PNGs, e atualiza
-run e artifacts no banco. Erro de dado marca como failed na hora; erro de infraestrutura
-volta pra fila até a 3ª tentativa. Os logs ETAPA 1/2/3 mostram onde cada run está.
+run e artifacts no banco. Erro de dado marca como failed na hora; qualquer outro erro
+volta pra fila até a 3ª tentativa, e nenhum erro derruba o processo. Os logs ETAPA 1/2/3
+mostram onde cada run está.
 """
 
 import asyncio
@@ -12,12 +13,10 @@ import logging
 import time
 
 from botocore.config import Config
-from botocore.exceptions import BotoCoreError, ClientError
-from sqlalchemy.exc import OperationalError
 
 from app.core.aws import aws_session
-from app.core.config import settings
 from app.core.cache import invalidate_user_cache
+from app.core.config import settings
 from app.db.models import Artifact, Run
 from app.db.session import session_scope
 from app.repositories import artifact_repository, run_repository
@@ -35,10 +34,9 @@ PLOT_FILES = {
 # Mesmo número do maxReceiveCount da fila. Na última tentativa o worker decide o fim,
 # então a mensagem nunca precisa cair na DLQ por falha transitória.
 MAX_ATTEMPTS = 3
-# Erro de dado: o CSV não serve. Não adianta tentar de novo.
+# Erro de dado: o CSV não serve. Não adianta tentar de novo. Qualquer outro erro
+# (S3, SQS, banco, Redis ou inesperado) volta pra fila até MAX_ATTEMPTS.
 PERMANENT_ERRORS = (ValueError, KeyError)
-# Erro de infraestrutura: S3, SQS ou banco fora do ar. Vale tentar de novo.
-TRANSIENT_ERRORS = (BotoCoreError, ClientError, OperationalError)
 
 
 async def _ensure_plot_artifact(
@@ -153,10 +151,22 @@ async def _mark_failed(run_id: int, message: str) -> None:
     await invalidate_user_cache(user_id=run.user_id)
 
 
+async def _delete_message(message: dict, sqs_client) -> None:
+    """Tira a mensagem da fila de vez (feita, falha final ou inválida)."""
+    await sqs_client.delete_message(
+        QueueUrl=settings.sqs_queue_url, ReceiptHandle=message["ReceiptHandle"]
+    )
+
+
 async def handle_message(message: dict, sqs_client) -> None:
     """Trata uma mensagem: decide se apaga da fila (feito ou falha final) ou se deixa voltar (erro transitório)."""
-    body = json.loads(message["Body"])
-    run_id = body["run_id"]
+    try:
+        run_id = int(json.loads(message["Body"])["run_id"])
+    except (ValueError, KeyError, TypeError):
+        # Sem run_id não há run para marcar como failed, e tentar de novo não muda nada.
+        logger.error("Mensagem sem run_id válido, descartada: %r", message.get("Body"))
+        await _delete_message(message, sqs_client)
+        return
     attempts = int(message["Attributes"]["ApproximateReceiveCount"])
     logger.info("ETAPA 1 recebida: run %s (tentativa %s).", run_id, attempts)
 
@@ -166,20 +176,17 @@ async def handle_message(message: dict, sqs_client) -> None:
         # O detalhe técnico vai pro log; o usuário vê só a mensagem geral.
         logger.warning("Run %s: CSV não pôde ser processado: %r", run_id, exc)
         await _mark_failed(run_id, "Processamento falhou: o CSV não pôde ser lido.")
-    except TRANSIENT_ERRORS:
+    except Exception:
+        # Infraestrutura (S3, SQS, banco, Redis) ou erro inesperado: vale tentar de novo.
         if attempts < MAX_ATTEMPTS:
             logger.exception(
-                "Run %s: erro transitório na tentativa %s; tentando de novo.",
-                run_id,
-                attempts,
+                "Run %s: erro na tentativa %s; tentando de novo.", run_id, attempts
             )
             return  # não apaga: a mensagem volta pra fila depois do visibility timeout
         logger.exception("Run %s: esgotou as %s tentativas.", run_id, MAX_ATTEMPTS)
         await _mark_failed(run_id, "Falha no processamento. Tente reenviar o CSV.")
 
-    await sqs_client.delete_message(
-        QueueUrl=settings.sqs_queue_url, ReceiptHandle=message["ReceiptHandle"]
-    )
+    await _delete_message(message, sqs_client)
 
 
 async def run_forever() -> None:
@@ -201,8 +208,15 @@ async def run_forever() -> None:
                         AttributeNames=["ApproximateReceiveCount"],
                     )
                     for message in response.get("Messages", []):
-                        await handle_message(message, sqs)
-        except (BotoCoreError, ClientError):
+                        try:
+                            await handle_message(message, sqs)
+                        except Exception:
+                            # Ex.: o banco caiu no meio do _mark_failed. A mensagem não foi
+                            # apagada e volta pra fila; o worker segue vivo para as próximas.
+                            logger.exception(
+                                "Erro ao tratar mensagem; ela voltará à fila."
+                            )
+        except Exception:
             logger.exception("Falha ao consultar a fila; tentando de novo em 5s.")
             await asyncio.sleep(5)
 

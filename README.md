@@ -16,11 +16,12 @@ Na AWS: RDS, S3, ElastiCache, DynamoDB, SNS/SQS e Auto Scaling (ver `docs/`).
 
 ```bash
 cp .env.example .env            # ajuste os valores se quiser; o .env não vai para o git
-docker compose up -d            # sobe o Postgres
-uv sync                         # instala as dependências
-uv run alembic upgrade head     # cria as tabelas
-uv run fastapi dev app/main.py  # API em http://127.0.0.1:8000
+docker compose up -d --build    # Postgres, Redis, migrations, API (:8000) e worker
 ```
+
+O serviço `migrate` roda `alembic upgrade head` sozinho a cada `up`, depois que o Postgres aceita
+conexões; a API e o worker só sobem se ele terminar com sucesso. Se a API não subir, veja
+`docker compose logs migrate`.
 
 A documentação interativa (gerada automaticamente) fica em **http://127.0.0.1:8000/docs**.
 
