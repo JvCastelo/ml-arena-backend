@@ -5,7 +5,7 @@ recebe um CSV de medido×previsto, gera gráficos de forma assíncrona e permite
 lado a lado. Trabalho Prático 1 de Desenvolvimento de Software para Nuvem (UFC).
 
 Stack: FastAPI, SQLAlchemy 2.0 (async) + asyncpg, PostgreSQL, Alembic, Pydantic, uv e ruff.
-Na AWS: RDS, S3, ElastiCache, DynamoDB, SNS/SQS e Auto Scaling (ver `docs/`).
+Na AWS: RDS, S3, ElastiCache, DynamoDB, SNS/SQS e Auto Scaling.
 
 ## Pré-requisitos
 
@@ -16,30 +16,29 @@ Na AWS: RDS, S3, ElastiCache, DynamoDB, SNS/SQS e Auto Scaling (ver `docs/`).
 
 ```bash
 cp .env.example .env            # ajuste os valores se quiser; o .env não vai para o git
-docker compose up -d            # sobe o Postgres
-uv sync                         # instala as dependências
-uv run alembic upgrade head     # cria as tabelas
-uv run fastapi dev app/main.py  # API em http://127.0.0.1:8000
+docker compose up -d --build    # Postgres, Redis, migrations, API (:8000) e worker
 ```
+
+O serviço `migrate` roda `alembic upgrade head` sozinho a cada `up`, depois que o Postgres aceita
+conexões; a API e o worker só sobem se ele terminar com sucesso. Se a API não subir, veja
+`docker compose logs migrate`.
 
 A documentação interativa (gerada automaticamente) fica em **http://127.0.0.1:8000/docs**.
 
-### Usuário de desenvolvimento
-
-Ainda não existe cadastro, e as rotas de runs exigem um usuário. Crie um direto no banco e use o
-`id` devolvido no header `X-User-Id` (autenticação provisória, veja `docs/api-contract.md`):
-
-```bash
-docker compose exec -T db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"' <<'SQL'
-INSERT INTO users (name, email, password_hash) VALUES ('Dev', 'dev@example.com', 'x') RETURNING id;
-SQL
-```
-
 ### Exemplo
 
+As rotas de runs exigem login (JWT no header `Authorization: Bearer ...`). Cadastre um usuário,
+faça login (o corpo é form-data, não JSON) e use o token devolvido:
+
 ```bash
+curl -X POST http://127.0.0.1:8000/api/v1/users/ -H "Content-Type: application/json" \
+  -d '{"name": "Dev", "email": "dev@example.com", "password": "teste123"}'
+
+TOKEN=$(curl -s -X POST http://127.0.0.1:8000/api/v1/auth/login \
+  -d "username=dev@example.com&password=teste123" | python3 -c "import sys, json; print(json.load(sys.stdin)['access_token'])")
+
 curl -X POST http://127.0.0.1:8000/api/v1/runs \
-  -H "X-User-Id: 1" -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
   -d '{"name": "xgb-v1", "algorithm": "XGBoost", "hyperparams": {"max_depth": 6}, "metrics": {"test": {"rmse": 1.1}}}'
 ```
 
@@ -48,13 +47,18 @@ curl -X POST http://127.0.0.1:8000/api/v1/runs \
 | Método | Rota | Descrição |
 |---|---|---|
 | `GET` | `/health` | Health check (usado pelo ALB) |
+| `POST` | `/api/v1/users/` | Cadastra um usuário |
+| `GET` | `/api/v1/users/me` | Dados do usuário logado |
+| `POST` | `/api/v1/auth/login` | Login (form-data); devolve o token JWT |
 | `POST` | `/api/v1/runs` | Cria um run |
 | `GET` | `/api/v1/runs` | Lista os runs do usuário (paginação e filtros) |
+| `GET` | `/api/v1/runs/compare?run_a=&run_b=` | Compara dois runs lado a lado (com cache no Redis) |
 | `GET` | `/api/v1/runs/{id}` | Detalhe de um run, com seus artifacts |
 | `PATCH` | `/api/v1/runs/{id}` | Edita um run parcialmente |
 | `DELETE` | `/api/v1/runs/{id}` | Apaga um run |
+| `POST` | `/api/v1/runs/{id}/measured-predicted` | Sobe o CSV medido×previsto; o worker gera os plots |
 
-Formatos completos, erros e o que ainda falta: `docs/api-contract.md`.
+Formatos completos de entrada e saída: **http://127.0.0.1:8000/docs**.
 
 ## Desenvolvimento
 
@@ -77,20 +81,16 @@ app/
 ├── main.py         # FastAPI, lifespan e /health
 ├── api/            # deps.py (dependências) e v1/ (router + routes/)
 ├── schemas/        # Pydantic: formato do JSON de entrada e saída
-├── core/           # configuração (config.py)
+├── services/       # regras de negócio, S3, SNS e auditoria (DynamoDB)
+├── repositories/   # acesso ao banco
+├── core/           # configuração, segurança (JWT), cache (Redis) e cliente AWS
 └── db/             # models/, session.py (async) e migrations/ (Alembic)
-docs/               # db-diagram.md (modelo de dados), api-contract.md (contrato da API)
-CLAUDE.md           # contexto do projeto para sessões do Claude Code
+worker/             # consome a fila SQS e gera os plots de cada CSV
+tests/              # pytest
 ```
-
-## Documentação
-
-- [`docs/db-diagram.md`](docs/db-diagram.md): modelo de dados, restrições e como alterar o schema.
-- [`docs/api-contract.md`](docs/api-contract.md): contrato da API e decisões em aberto.
-- [`CLAUDE.md`](CLAUDE.md): estado do projeto, decisões, armadilhas e próximos passos.
 
 ## Decisão sobre o arquivo binário obrigatório
 
 O enunciado exige ao menos um arquivo binário no fluxo principal. O CSV de entrada é texto, então o
 requisito é cumprido pelos **dois plots PNG** gerados pelo worker e guardados no S3
-(`measured_predicted.png` e `residuals.png`). *(Decisão ainda em discussão; ver `docs/api-contract.md`.)*
+(`measured_predicted.png` e `residuals.png`).

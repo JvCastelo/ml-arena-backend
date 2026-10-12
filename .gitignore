@@ -22,5 +22,11 @@ __pycache__/
 .DS_Store
 Thumbs.db
 
-# Documentação / Específico do Projeto
-docs/spec.md
+# Documentação e arquivos de IA (ficam só na máquina de cada um)
+docs/
+CLAUDE.md
+.claude/
+AGENTS.md
+
+# Chaves e certificados (ex.: par de chaves da EC2)
+*.pem

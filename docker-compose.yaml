@@ -10,6 +10,25 @@ services:
       - "${DB_EXTERNAL_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    # "Pronto" = aceita conexões, não só "container de pé". O migrate espera por isso.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
+  # Roda as migrations uma vez e termina. API e worker só sobem se ele terminar com sucesso.
+  migrate:
+    build: .
+    env_file:
+      - .env
+    volumes:
+      - .:/workspace
+    depends_on:
+      db:
+        condition: service_healthy
+    command: alembic upgrade head
+    restart: "no"
 
   api:
     build: .
@@ -21,7 +40,10 @@ services:
     volumes:
       - .:/workspace
     depends_on:
-      - db
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_started
     command: fastapi dev app/main.py --host 0.0.0.0 --port 8000
 
   worker:
@@ -32,7 +54,10 @@ services:
     volumes:
       - .:/workspace
     depends_on:
-      - db
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_started
     command: python -m worker.consumer
 
   redis:
